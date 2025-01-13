@@ -146,7 +146,7 @@ def process_data(data):
     df = None
     if transactions:
       df = pd.DataFrame(transactions)
-      df['date'] = pd.to_datetime(df['date'], errors='coerce')
+      df['date'] = pd.to_datetime(df['date'], errors='coerce', format = 'mixed')
       df['money_out'] = pd.to_numeric(df['money_out'], errors='coerce').fillna(0)
       df['money_in'] = pd.to_numeric(df['money_in'], errors='coerce').fillna(0)
     
@@ -157,6 +157,23 @@ def generate_financial_summary(summary_data, df, time_frame):
 
     if not summary_data or df is None or df.empty:
         return "No data available for financial summary."
+    
+    formatted_starting_balance = summary_data.get('starting_balance', 'N/A')
+    formatted_total_money_in = summary_data.get('total_money_in', 'N/A')
+    formatted_total_money_out = summary_data.get('total_money_out', 'N/A')
+    formatted_ending_balance = summary_data.get('ending_balance', 'N/A')
+
+    if isinstance(formatted_starting_balance, str):
+      formatted_starting_balance = formatted_starting_balance.replace(",", "")
+
+    if isinstance(formatted_total_money_in, str):
+      formatted_total_money_in = formatted_total_money_in.replace(",", "")
+
+    if isinstance(formatted_total_money_out, str):
+      formatted_total_money_out = formatted_total_money_out.replace(",", "")
+
+    if isinstance(formatted_ending_balance, str):
+      formatted_ending_balance = formatted_ending_balance.replace(",", "")
 
     if time_frame:
           summary_text = f"""
@@ -166,10 +183,10 @@ def generate_financial_summary(summary_data, df, time_frame):
             Account Number: {summary_data.get('account_number', 'N/A')}
             Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
             Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
-            Starting Balance: £{summary_data.get('starting_balance', 'N/A').replace(",", "")}
-            Total Money In: £{summary_data.get('total_money_in', 'N/A').replace(",", "")}
-            Total Money Out: £{summary_data.get('total_money_out', 'N/A').replace(",", "")}
-            Ending Balance: £{summary_data.get('ending_balance', 'N/A').replace(",", "")}
+            Starting Balance: £{formatted_starting_balance}
+            Total Money In: £{formatted_total_money_in}
+            Total Money Out: £{formatted_total_money_out}
+            Ending Balance: £{formatted_ending_balance}
 
             Transactions:
             {df.to_markdown(index = False)}
@@ -191,10 +208,10 @@ def generate_financial_summary(summary_data, df, time_frame):
             Account Number: {summary_data.get('account_number', 'N/A')}
             Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
             Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
-            Starting Balance: £{summary_data.get('starting_balance', 'N/A').replace(",", "")}
-            Total Money In: £{summary_data.get('total_money_in', 'N/A').replace(",", "")}
-            Total Money Out: £{summary_data.get('total_money_out', 'N/A').replace(",", "")}
-            Ending Balance: £{summary_data.get('ending_balance', 'N/A').replace(",", "")}
+            Starting Balance: £{formatted_starting_balance}
+            Total Money In: £{formatted_total_money_in}
+            Total Money Out: £{formatted_total_money_out}
+            Ending Balance: £{formatted_ending_balance}
 
             Transactions:
             {df.to_markdown(index = False)}
@@ -207,7 +224,6 @@ def generate_financial_summary(summary_data, df, time_frame):
                 - Notable recurring items like income and expenses
             Provide key insights and recommendations in points. Make the output very well structured and formatted using markdown
         """
-
 
     try:
         response = genai.GenerativeModel("gemini-1.5-flash").generate_content(summary_text)
@@ -257,17 +273,32 @@ def create_pdf_report(summary, filename, time_frame = None):
 # Create tabs at the top
 tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
 
-# Add title and subtitle
-st.markdown('<h1 class="title">FinExtract</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">This app helps you extract information from your bank statement PDF.</p>', unsafe_allow_html=True)
-
 # Handle tab content
 with tab1:
+    # Add title and subtitle
+    st.markdown('<h1 class="title">FinExtract</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">This app helps you extract information from your bank statement PDF.</p>', unsafe_allow_html=True)
+
     st.write("Welcome to FinExtract!")
     st.write("""This application helps you extract key information from your bank statements quickly and efficiently.
     Navigate to the AI Service tab to upload your bank statement and get started.""")
 
 with tab2:
+    st.markdown("""
+            <style>
+                .stFileUploader label {
+                    background-color: #00664D !important;
+                    color: white !important;
+                    border-radius: 5px !important;
+                    padding: 10px 20px !important;
+                    transition: background-color 0.3s, color 0.3s !important;
+                 }
+
+                 .stFileUploader label:hover {
+                     background-color: #004D40 !important;
+                 }
+            </style>
+        """, unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
         "Upload your bank statement PDF",
         type=["pdf"],
@@ -347,12 +378,14 @@ with tab2:
                         # Display extracted information
                         labels = ["Bank Name", "Customer Name", "Account Number", "Statement Start Date", "Statement End Date", "Starting Balance", "Total Money In", "Total Money Out", "Ending Balance"]
                         for label, key in zip(labels, summary_data):
-                            st.markdown(f"<p style='font-family: Arial; color: black; font-size: 20px;'>{label}:</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='font-family: Arial; color: black; font-size: 10px;'>{label}:</p>", unsafe_allow_html=True)
                             st.write(summary_data[key] if summary_data[key] != "N/A" else "N/A")
 
                     if df is not None and not df.empty:
                         with st.expander("Transactions Table", expanded=True):
-                            st.dataframe(df)
+                             # Convert Date column to string to avoid issues with display
+                             df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+                             st.dataframe(df)
                 else:
                     st.error("No data found.")
             
@@ -378,8 +411,123 @@ with tab2:
                        st.error(f"Error getting response from Gemini API: {e}")
 
 with tab3:
-    st.write("### Contact Information")
-    st.write("For support or inquiries, please reach out to us:")
-    st.write("📧 Email: support@finextract.com")
-    st.write("📞 Phone: +1-XXX-XXX-XXXX")
-    st.write("🌐 Website: www.finextract.com")
+    # Contact page container
+    st.markdown("""
+        <div style='text-align: center; padding: 2rem 0;'>
+            <h1 style='color: #000080; margin-bottom: 2rem;'>Get in Touch</h1>
+            <p style='font-size: 1.2rem; color: #333; margin-bottom: 3rem;'>
+                Have questions or need assistance? We're here to help!
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Create three columns for contact information
+    col1, col2, col3 = st.columns(3)
+
+    contact_box_style = """
+        text-align: center;
+        padding: 2rem;
+        background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
+        border-radius: 15px;
+        position: relative;
+        min-height: 250px;
+        box-shadow: 0 4px 15px rgba(0,0,128,0.1);
+    """
+
+    # Add a gradient border using pseudo-element
+    contact_box_wrapper = """
+        position: relative;
+        padding: 3px;
+        background: linear-gradient(145deg, #000080, #0000b3);
+        border-radius: 15px;
+        margin-bottom: 1rem;
+    """
+
+    with col1:
+        st.markdown(f"""
+            <div style='{contact_box_wrapper}'>
+                <div style='{contact_box_style}'>
+                <h3 style='color: #000080; margin-bottom: 0rem; padding-bottom:2rem'>📧 Email Us</h3>
+                <p style='color: #333;'>For general inquiries:</p>
+                <a href='mailto:kanzaakram123@gmail.com' style='color: #000080; text-decoration: none; font-weight: bold;'>
+                    kanzaakram123@gmail.com
+                </a>                <p style='color: #333; margin-top: 1rem;'>We typically respond within 24 hours.</p>
+                </div>
+            </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+            <div style='{contact_box_wrapper}'>
+                <div style='{contact_box_style}'>
+                <h3 style='color: #000080; margin-bottom: 0rem;'>📞 Call Us</h3>
+                <p style='color: #333;'>Customer Support:</p>
+                <p style='color: #000080; font-weight: bold;'>+1-XXX-XXX-XXXX</p>
+                <p style='color: #333; margin-top: 1rem; padding-bottom:3.7rem'>Available Monday-Friday<br>9:00 AM - 5:00 PM EST</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+            <div style='{contact_box_wrapper}'>
+                <div style='{contact_box_style}'>
+                <h3 style='color: #000080; margin-bottom: 0rem'>🌐 Visit Us</h3>
+                <p style='color: #333;'>Find us online:</p>
+                <a href='https://finextract.streamlit.app/' target='_blank' style='color: #000080; text-decoration: none; font-weight: bold;'>
+                    finextract.streamlit.app
+                </a>
+                <p style='color: #333; margin-top: 1rem;padding-bottom:4.7rem'>Available 24/7</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Add FAQ section
+    st.markdown("""
+        <div style='margin-top: 4rem; text-align: center;'>
+            <h2 style='color: #000080; margin-bottom: 2rem;'>Frequently Asked Questions</h2>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Create expandable FAQ items
+    with st.expander("How secure is my bank statement data?"):
+        st.write("""
+            Your security is our top priority. All uploaded bank statements are processed securely and are never stored on our servers. 
+            We use state-of-the-art encryption to protect your data during transmission.
+        """)
+
+    with st.expander("What file formats are supported?"):
+        st.write("""
+            Currently, we support PDF format for bank statements. We're working on adding support for additional formats in future updates.
+        """)
+
+    with st.expander("How accurate is the data extraction?"):
+        st.write("""
+            Our AI-powered system is highly accurate in extracting data from standard bank statement formats. 
+            However, we recommend reviewing the extracted information for accuracy, especially for unusual transaction descriptions or special characters.
+        """)
+
+    # Add a contact form
+    st.markdown("""
+        <div style='margin-top: 4rem; text-align: center;'>
+            <h2 style='color: #000080; margin-bottom: 2rem;'>Send Us a Message</h2>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Create two columns for the contact form
+    form_col1, form_col2 = st.columns(2)
+
+    with form_col1:
+        name = st.text_input("Name")
+        email = st.text_input("Email")
+        
+    with form_col2:
+        subject = st.text_input("Subject")
+        message = st.text_area("Message")
+
+    # Center the submit button
+    col1, col2, col3 = st.columns([1,1,1])
+    with col2:
+        if st.button("Send Message", type="primary"):
+            st.success("Thank you for your message! We'll get back to you soon.")
