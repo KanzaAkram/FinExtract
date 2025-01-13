@@ -1,5 +1,5 @@
-
-
 [theme]
 base="light"
 font="monospace"
+primaryColor="#000080"  # Dark blue
+secondaryBackgroundColor="#000080"  # Dark blue for sidebar

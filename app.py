@@ -2,130 +2,253 @@ import base64
 import json
 from io import BytesIO
 import PyPDF2
+import re
+import random
+import string
 import streamlit as st
-from streamlit_javascript import st_javascript
-from streamlit_pdf_viewer import pdf_viewer
-from openai import OpenAI
-
+import pdfplumber  # A better PDF text extractor
+import google.generativeai as genai  # Import Gemini API
+import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
 
 # Setting Streamlit page configuration
-st.set_page_config(page_title="Bank-Statement-extractor", page_icon="📖", layout="wide")
+st.set_page_config(page_title="FinExtract", page_icon="📖", layout="wide")
 
 hide_streamlit_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            div[data-testid="stToolbar"] {visibility: hidden;}
             </style>
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# Add main container with gradient background
+st.markdown('<div class="main">', unsafe_allow_html=True)
+
 def local_css(file_name):
     with open(file_name) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-        
 
 local_css("style.css")
 
-
-
-# Function to convert PDF to structured text
+# Function to convert PDF to structured text using pdfplumber
 def convert_pdf_to_structured_text(pdf_file):
     """Extracts text from a PDF file and returns it with basic formatting."""
     if not pdf_file:
-        return ""  # Handle empty file case
+        st.error("No file uploaded. Please upload a valid PDF file.")  # Show error if no file
+        return ""  # Return empty string if no file uploaded
 
-    with BytesIO(pdf_file.read()) as buffer:  # Use BytesIO to read file-like object
-        pdf_reader = PyPDF2.PdfReader(buffer)
-        num_pages = len(pdf_reader.pages)
+    try:
+        with BytesIO(pdf_file.read()) as buffer:  # Use BytesIO to read file-like object
+            with pdfplumber.open(buffer) as pdf:
+                num_pages = len(pdf.pages)
 
-        text = ""
-        for page_num in range(num_pages):
-            page = pdf_reader.pages[page_num]
-            text += page.extract_text() + "\n\n"  # Add double line breaks for page breaks
+                if num_pages == 0:
+                    st.error("Uploaded file is empty. Please upload a valid PDF file.")  # Error for empty PDF
+                    return ""  # Return empty if PDF is empty
 
-        return text
+                text = ""
+                for page_num in range(num_pages):
+                    page = pdf.pages[page_num]
+                    text += page.extract_text() + "\n\n"  # Add double line breaks for page breaks
 
-# Setting up OpenAI API key
+                return text
+    except Exception as e:
+        st.error(f"Error reading the PDF file: {e}")  # Error message for any other issues
+        return ""  # Return empty string in case of error
 
-openai_api_key = st.secrets["API_KEY"]
+# Setting up Gemini API key
+gemini_api_key = st.secrets["API_KEY"]  # Replace with your Gemini API key
 
+# Initialize Gemini client
+genai.configure(api_key=gemini_api_key)
 
-# Initializing messages list
-messages = []
+# Generate a unique key based on the uploaded file's name or a random string
+def generate_unique_key(uploaded_file):
+    random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))  # Generate random string
+    return f"pdf_viewer_{uploaded_file.name}_{random_str}"
 
-# App layout
-st.header("Bank Statement Data Extractor App")
+# Function to parse bank statement
+def parse_bank_statement_with_gemini(text):
+    """Parses the bank statement using Gemini to extract structured data."""
+    if not text:
+        return None
 
+    prompt = f"""
+    You are an expert in analyzing bank statements.
+    Your task is to extract key information from the provided text of a bank statement.
+    The response should be a valid JSON object. Do not return any code or any comments outside the JSON.
+    The json object should have following information as keys:
+        -   "bank_name": The name of the bank.
+        -   "customer_name": The full name of the account holder.
+        -   "account_number": The account number.
+        -   "statement_start_date": The starting date of the statement.
+        -   "statement_end_date": The end date of the statement.
+        -   "starting_balance": The starting balance of the statement.
+        -   "total_money_in": Total amount received in the statement period.
+        -   "total_money_out": The total amount spent during the statement period.
+        -   "ending_balance": The closing balance in the statement.
+        -   "transactions" : an array with elements as object. Each object containing transaction info. The info is date, description, money_out, money_in and balance
 
-if "generated" not in st.session_state:
-    st.session_state["generated"] = []
-
-if "past" not in st.session_state:
-    st.session_state["past"] = []
-
-# Function to clear submit flag
-def clear_submit():
-    st.session_state["submit"] = False
-
-
-# Sidebar upload and processing
-with st.sidebar:
-    st.markdown("<p style='font-family: san serif; color: black; font-size: 20px; padding: 0px; margin: 0px'>Upload PDF</p>", unsafe_allow_html=True)
-    uploaded_file = st.file_uploader(
-        "Upload file",
-        type=["pdf"],
-        on_change=clear_submit,
-        label_visibility = "hidden"
-    )
+    If a piece of information can not be retrieved please fill "N/A" as the value of that key.
+    Here is the bank statement text:
+    ```
+    {text}
+    ```
+    """
     
+    try:
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
+        if response and response.text.strip():
+            # Attempt to parse the JSON response
+            try:
+                 cleaned_response = response.text.replace('```json','').replace('```','') # Remove any code formatting
+                 return json.loads(cleaned_response)
+            except json.JSONDecodeError as e:
+                st.error(f"Failed to parse the response: {e}, Raw: {response.text}")
+                return None
 
-    # pdf_viewer(uploaded_file)
-    structured_text = convert_pdf_to_structured_text(uploaded_file)
-    if structured_text:
-        prompt = f""" Below is a bank statement of a client in textual form. We want to find these information out of it: Bank name, Customer name, IBAN, Account number, Phone number, Salary, Statement balance, Highest spent amount, Highest received amount.
-        The output should be an array with the values like this: [Bank name, Customer name, IBAN, Account number, Phone number, Salary, Statement balance, Highest spent amount, Highest received amount]. And if there is no bank statement output an array like this ["N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"]
-        The bank statement text is: "{structured_text}"
-        """
-        client = OpenAI(api_key=openai_api_key)
-        messages.append([{"role": "user", "content":prompt }])
-        response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content":prompt }])
-        data = response.choices[0].message.content
-   
-    if structured_text:
+        else:
+            st.error("The API response is empty or invalid.")
+            return None
+    except Exception as e:
+         st.error(f"Failed to get response from Gemini API: {e}")
+         return None
         
-       
-        data  = json.loads(data)
+def process_data(data):
+    """Processes the data from Gemini for display and visualization."""
+    if not data:
+        return None, None, None, None
 
-
-# Main content display
-col1, col2 = st.columns(spec=[2, 1], gap="small")
-
-if uploaded_file:
-    with col1:
-        with st.container(border = True):
-            if uploaded_file:
-                pdf_viewer(uploaded_file.getvalue())
-                
-                
-                
-
-    with col2:
-        if data:
-            with st.expander("Get Customer Information",expanded = True):
-                # st.subheader("Get information")
-
-                # Display extracted information
-                labels = ["Bank Name", "Customer Name", "IBAN", "Account Number", "Phone Number", "Salary", "Statement Balance", "Highest Debited", "Highest Credited"]
-                for label, value in zip(labels, data):
-                    st.markdown(f"<p style='font-family: Arial; color: black; font-size: 25px;'>{label}:</p>", unsafe_allow_html=True)
-                    st.write(value)
-if uploaded_file == None:
+    summary_data = {
+      "bank_name": data.get("bank_name", "N/A"),
+      "customer_name": data.get("customer_name", "N/A"),
+      "account_number": data.get("account_number", "N/A"),
+      "statement_start_date": data.get("statement_start_date", "N/A"),
+      "statement_end_date": data.get("statement_end_date", "N/A"),
+      "starting_balance": data.get("starting_balance", "N/A"),
+      "total_money_in": data.get("total_money_in", "N/A"),
+      "total_money_out": data.get("total_money_out", "N/A"),
+      "ending_balance": data.get("ending_balance", "N/A")
+    }
     
-    st.write("""
-    This app helps you extract information from your bank statement PDF.
-    Upload your bank statement PDF file on the sidebar, and the app will extract 
-    information such as bank name, customer name, IBAN, account number, phone number, salary, 
-    statement balance, highest spent amount, and highest received amount.
+    transactions = data.get("transactions", [])
+    df = None
+    if transactions:
+      df = pd.DataFrame(transactions)
+      df['date'] = pd.to_datetime(df['date'], errors='coerce')
+      df['money_out'] = pd.to_numeric(df['money_out'], errors='coerce').fillna(0)
+      df['money_in'] = pd.to_numeric(df['money_in'], errors='coerce').fillna(0)
+    
+    return summary_data, df, transactions
 
-    Once you upload the PDF, the app will display the extracted information on the right side.
+def generate_financial_summary(summary_data, df):
+        """Generates a financial summary using Gemini."""
 
-    """)
+        if not summary_data or df is None or df.empty:
+            return "No data available for financial summary."
+
+        summary_text = f"""
+        Here is summary financial information:
+        Bank Name: {summary_data.get('bank_name', 'N/A')}
+        Customer Name: {summary_data.get('customer_name', 'N/A')}
+        Account Number: {summary_data.get('account_number', 'N/A')}
+        Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
+        Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
+        Starting Balance: {summary_data.get('starting_balance', 'N/A')}
+        Total Money In: {summary_data.get('total_money_in', 'N/A')}
+        Total Money Out: {summary_data.get('total_money_out', 'N/A')}
+        Ending Balance: {summary_data.get('ending_balance', 'N/A')}
+
+        Transactions:
+        {df.to_markdown(index = False)}
+        
+        Given the above financial data and transaction, generate a short and concise financial summary. Also mention the highest spending category and the highest income category.
+        """
+
+        try:
+          response = genai.GenerativeModel("gemini-1.5-flash").generate_content(summary_text)
+          if response and response.text.strip():
+              return response.text
+          else:
+              return "Could not generate a financial summary."
+        except Exception as e:
+          return f"Failed to get response from Gemini API: {e}"
+
+# Create tabs at the top
+tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
+
+# Add title and subtitle
+st.markdown('<h1 class="title">FinExtract</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">This app helps you extract information from your bank statement PDF.</p>', unsafe_allow_html=True)
+
+# Handle tab content
+with tab1:
+    st.write("Welcome to FinExtract!")
+    st.write("""This application helps you extract key information from your bank statements quickly and efficiently.
+    Navigate to the AI Service tab to upload your bank statement and get started.""")
+
+with tab2:
+    uploaded_file = st.file_uploader(
+        "Upload your bank statement PDF",
+        type=["pdf"],
+        key="pdf_uploader"
+    )
+
+    if uploaded_file:
+        structured_text = convert_pdf_to_structured_text(uploaded_file)
+        
+        if structured_text:
+            with st.spinner("Analyzing Bank Statement ..."):
+              parsed_data = parse_bank_statement_with_gemini(structured_text)
+
+            summary_data, df, transactions = process_data(parsed_data)
+            financial_summary = None
+            if summary_data and df is not None and not df.empty:
+               with st.spinner("Generating Financial Summary"):
+                   financial_summary = generate_financial_summary(summary_data, df)
+
+            # Display PDF and results in two columns
+            col1, col2 = st.columns(spec=[2, 1], gap="small")
+
+            with col1:
+                 with st.container(border=True):
+                    # Optionally render the PDF viewer
+                     st.text("PDF viewer would go here.")
+                 if financial_summary:
+                    with st.expander("Financial Summary", expanded = True):
+                        st.write(financial_summary)
+
+                 if df is not None and not df.empty:
+                    with st.expander("Monthly Spending Chart"):
+                        monthly_spending = df.groupby(df['date'].dt.month).agg({'money_out':'sum', 'money_in':'sum'})
+                        st.line_chart(monthly_spending)
+
+                    with st.expander("Category Spending Chart"):
+                        category_spending = df.groupby('description')['money_out'].sum()
+                        fig = px.pie(names = category_spending.index, values = category_spending.values)
+                        st.plotly_chart(fig)
+
+            with col2:
+                if summary_data:
+                    with st.expander("Customer Information", expanded=True):
+                        # Display extracted information
+                        labels = ["Bank Name", "Customer Name", "Account Number", "Statement Start Date", "Statement End Date", "Starting Balance", "Total Money In", "Total Money Out", "Ending Balance"]
+                        for label, key in zip(labels, summary_data):
+                            st.markdown(f"<p style='font-family: Arial; color: black; font-size: 20px;'>{label}:</p>", unsafe_allow_html=True)
+                            st.write(summary_data[key] if summary_data[key] != "N/A" else "N/A")
+
+                    if df is not None and not df.empty:
+                        with st.expander("Transactions Table", expanded=True):
+                            st.dataframe(df)
+                else:
+                      st.error("No data found.")
+
+with tab3:
+    st.write("### Contact Information")
+    st.write("For support or inquiries, please reach out to us:")
+    st.write("📧 Email: support@finextract.com")
+    st.write("📞 Phone: +1-XXX-XXX-XXXX")
+    st.write("🌐 Website: www.finextract.com")

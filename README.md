@@ -35,3 +35,36 @@
 - Install the required dependencies listed in the requirements.txt file.
 - Run the Streamlit application using the provided command.
 - Upload your bank statement PDF file and interact with the app to extract and analyze the data.
+
+
+Step 1: Create a Virtual Environment
+Create a virtual environment in your Codespaces workspace:
+
+bash
+Copy code
+python3 -m venv venv
+Step 2: Activate the Virtual Environment
+Activate the environment:
+
+bash
+Copy code
+source venv/bin/activate
+If the above command works, your shell prompt should show something like (venv).
+
+Step 3: Install Dependencies
+Now, install the required dependencies:
+
+If you have requirements.txt:
+bash
+Copy code
+pip install -r requirements.txt
+If streamlit is not listed in requirements.txt: Install it manually:
+bash
+Copy code
+pip install streamlit
+Step 4: Run the Streamlit App
+Run the app using:
+
+bash
+Copy code
+streamlit run app.py
