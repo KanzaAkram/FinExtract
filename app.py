@@ -11,6 +11,14 @@ import google.generativeai as genai  # Import Gemini API
 import matplotlib.pyplot as plt
 import pandas as pd
 import plotly.express as px
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
+from reportlab.lib import colors
+import calendar
 
 # Setting Streamlit page configuration
 st.set_page_config(page_title="FinExtract", page_icon="📖", layout="wide")
@@ -144,38 +152,107 @@ def process_data(data):
     
     return summary_data, df, transactions
 
-def generate_financial_summary(summary_data, df):
-        """Generates a financial summary using Gemini."""
+def generate_financial_summary(summary_data, df, time_frame):
+    """Generates a detailed financial summary using Gemini."""
 
-        if not summary_data or df is None or df.empty:
-            return "No data available for financial summary."
+    if not summary_data or df is None or df.empty:
+        return "No data available for financial summary."
 
-        summary_text = f"""
-        Here is summary financial information:
-        Bank Name: {summary_data.get('bank_name', 'N/A')}
-        Customer Name: {summary_data.get('customer_name', 'N/A')}
-        Account Number: {summary_data.get('account_number', 'N/A')}
-        Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
-        Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
-        Starting Balance: {summary_data.get('starting_balance', 'N/A')}
-        Total Money In: {summary_data.get('total_money_in', 'N/A')}
-        Total Money Out: {summary_data.get('total_money_out', 'N/A')}
-        Ending Balance: {summary_data.get('ending_balance', 'N/A')}
+    if time_frame:
+          summary_text = f"""
+            Here is the financial data:
+            Bank Name: {summary_data.get('bank_name', 'N/A')}
+            Customer Name: {summary_data.get('customer_name', 'N/A')}
+            Account Number: {summary_data.get('account_number', 'N/A')}
+            Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
+            Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
+            Starting Balance: £{summary_data.get('starting_balance', 'N/A').replace(",", "")}
+            Total Money In: £{summary_data.get('total_money_in', 'N/A').replace(",", "")}
+            Total Money Out: £{summary_data.get('total_money_out', 'N/A').replace(",", "")}
+            Ending Balance: £{summary_data.get('ending_balance', 'N/A').replace(",", "")}
 
-        Transactions:
-        {df.to_markdown(index = False)}
-        
-        Given the above financial data and transaction, generate a short and concise financial summary. Also mention the highest spending category and the highest income category.
+            Transactions:
+            {df.to_markdown(index = False)}
+
+            Analyze the provided financial data and transactions for {time_frame}, then generate a detailed financial summary. The summary should include:
+                - An overview of financial health.
+                - Income analysis with sources.
+                - Spending analysis with major categories.
+                - Highest spending and income categories
+                - Notable recurring items like income and expenses
+            Provide key insights and recommendations in points. Make the output very well structured and formatted using markdown
         """
 
-        try:
-          response = genai.GenerativeModel("gemini-1.5-flash").generate_content(summary_text)
-          if response and response.text.strip():
-              return response.text
-          else:
-              return "Could not generate a financial summary."
-        except Exception as e:
-          return f"Failed to get response from Gemini API: {e}"
+    else:
+        summary_text = f"""
+            Here is the financial data:
+            Bank Name: {summary_data.get('bank_name', 'N/A')}
+            Customer Name: {summary_data.get('customer_name', 'N/A')}
+            Account Number: {summary_data.get('account_number', 'N/A')}
+            Statement Start Date: {summary_data.get('statement_start_date', 'N/A')}
+            Statement End Date: {summary_data.get('statement_end_date', 'N/A')}
+            Starting Balance: £{summary_data.get('starting_balance', 'N/A').replace(",", "")}
+            Total Money In: £{summary_data.get('total_money_in', 'N/A').replace(",", "")}
+            Total Money Out: £{summary_data.get('total_money_out', 'N/A').replace(",", "")}
+            Ending Balance: £{summary_data.get('ending_balance', 'N/A').replace(",", "")}
+
+            Transactions:
+            {df.to_markdown(index = False)}
+
+            Analyze the provided financial data and transactions, then generate a detailed financial summary. The summary should include:
+                - An overview of financial health.
+                - Income analysis with sources.
+                - Spending analysis with major categories.
+                - Highest spending and income categories
+                - Notable recurring items like income and expenses
+            Provide key insights and recommendations in points. Make the output very well structured and formatted using markdown
+        """
+
+
+    try:
+        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(summary_text)
+        if response and response.text.strip():
+            return response.text
+        else:
+            return "Could not generate a financial summary."
+    except Exception as e:
+        return f"Failed to get response from Gemini API: {e}"
+
+def create_pdf_report(summary, filename, time_frame = None):
+    """Creates a PDF report of the financial summary."""
+
+    doc = SimpleDocTemplate(filename, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+      # Custom title style
+    title_style = ParagraphStyle(
+      'Title',
+      parent = styles['h1'],
+      fontSize=20,
+      alignment=TA_LEFT,
+      textColor=colors.navy
+      )
+
+    if time_frame:
+        story.append(Paragraph(f"Financial Summary for {time_frame}", title_style))
+    else:
+       story.append(Paragraph("Financial Summary", title_style))
+
+
+    # Custom text style
+    text_style = ParagraphStyle(
+        'Text',
+        parent=styles['Normal'],
+        fontSize=12,
+        leading=16,
+        alignment=TA_JUSTIFY
+    )
+    
+    story.append(Paragraph(summary, text_style))
+
+    doc.build(story)
+
 
 # Create tabs at the top
 tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
@@ -205,30 +282,63 @@ with tab2:
               parsed_data = parse_bank_statement_with_gemini(structured_text)
 
             summary_data, df, transactions = process_data(parsed_data)
+            time_frame = None
+            if summary_data and df is not None and not df.empty:
+                if df['date'].dt.year.nunique() > 1:
+                  unique_years = sorted(df['date'].dt.year.unique(), reverse = True)
+                  time_frame = st.select_slider("Select time frame", options = ["All time"] + [f"{year}" for year in unique_years] + [f"{calendar.month_name[month]}-{year}" for year in unique_years for month in range(1,13)])
+                  if time_frame != "All time":
+                    if time_frame.find("-") != -1:
+                      month, year = time_frame.split("-")
+                      df = df[(df['date'].dt.year == int(year)) & (df['date'].dt.month == list(calendar.month_name).index(month))]
+                      time_frame = f"{calendar.month_name[list(calendar.month_name).index(month)]} of {year}"
+                    else:
+                      df = df[df['date'].dt.year == int(time_frame)]
+                      time_frame = f"Year {time_frame}"
+
             financial_summary = None
             if summary_data and df is not None and not df.empty:
-               with st.spinner("Generating Financial Summary"):
-                   financial_summary = generate_financial_summary(summary_data, df)
+                with st.spinner("Generating Financial Summary"):
+                   financial_summary = generate_financial_summary(summary_data, df, time_frame)
 
             # Display PDF and results in two columns
             col1, col2 = st.columns(spec=[2, 1], gap="small")
 
             with col1:
-                 with st.container(border=True):
+                with st.container(border=True):
                     # Optionally render the PDF viewer
                      st.text("PDF viewer would go here.")
-                 if financial_summary:
-                    with st.expander("Financial Summary", expanded = True):
+
+                if financial_summary:
+                    with st.expander("Financial Summary", expanded=True):
                         st.write(financial_summary)
 
-                 if df is not None and not df.empty:
+                        # Download PDF report
+                        report_filename = "financial_report.pdf"
+                        create_pdf_report(financial_summary, report_filename, time_frame)
+                        with open(report_filename, "rb") as f:
+                            pdf_bytes = f.read()
+
+                        st.download_button(
+                            label="Download Financial Report (PDF)",
+                            data=pdf_bytes,
+                            file_name=report_filename,
+                            mime="application/pdf",
+                        )
+
+                if df is not None and not df.empty:
                     with st.expander("Monthly Spending Chart"):
                         monthly_spending = df.groupby(df['date'].dt.month).agg({'money_out':'sum', 'money_in':'sum'})
-                        st.line_chart(monthly_spending)
+                        monthly_spending.index = [calendar.month_name[month] for month in monthly_spending.index]
+                        monthly_spending = monthly_spending.reindex([calendar.month_name[month] for month in range(1,13)], fill_value=0)
+                        fig = px.line(monthly_spending, x = monthly_spending.index, y = ['money_out', 'money_in'])
+                        st.plotly_chart(fig)
+
 
                     with st.expander("Category Spending Chart"):
                         category_spending = df.groupby('description')['money_out'].sum()
-                        fig = px.pie(names = category_spending.index, values = category_spending.values)
+                        fig = px.pie(names=category_spending.index, values=category_spending.values, hole = 0.3)
+                        fig.update_traces(textposition='outside', textinfo='percent+label')
                         st.plotly_chart(fig)
 
             with col2:
@@ -244,7 +354,28 @@ with tab2:
                         with st.expander("Transactions Table", expanded=True):
                             st.dataframe(df)
                 else:
-                      st.error("No data found.")
+                    st.error("No data found.")
+            
+            # Add a chat interface at bottom
+            if structured_text:
+               st.markdown("<hr>", unsafe_allow_html=True)
+               st.subheader("Chat with your bank statement")
+               query = st.text_input("Enter your question:")
+               if query:
+                   chat_prompt = f"""
+                       You are a helpful assistant, skilled at understanding and responding to questions regarding bank statements.
+                       Here is a bank statement text : "{structured_text}"
+                       Here is the user query: "{query}"
+                       Provide a response in markdown format.
+                     """
+                   try:
+                        chat_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(chat_prompt)
+                        if chat_response and chat_response.text.strip():
+                            st.write(chat_response.text)
+                        else:
+                            st.write("Could not generate a response.")
+                   except Exception as e:
+                       st.error(f"Error getting response from Gemini API: {e}")
 
 with tab3:
     st.write("### Contact Information")
