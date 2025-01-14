@@ -19,6 +19,13 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from reportlab.lib import colors
 import calendar
+import logging  # Import the logging module
+from time import sleep # Import sleep function
+from streamlit_modal import Modal
+import streamlit.components.v1 as components
+
+# Configure logging to output to console
+logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Setting Streamlit page configuration
 st.set_page_config(page_title="FinExtract", page_icon="📖", layout="wide")
@@ -78,12 +85,33 @@ def generate_unique_key(uploaded_file):
     random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))  # Generate random string
     return f"pdf_viewer_{uploaded_file.name}_{random_str}"
 
+def clean_json_string(text):
+    """Cleans a JSON string to handle various escaping and formatting issues."""
+    # Handle escaped quotes within strings
+    cleaned_text = re.sub(r'\\"', r'"', text)
+    # remove non-escaped backslashes
+    cleaned_text = re.sub(r'\\(?!\")|\\\\', r'', cleaned_text)
+    cleaned_text = re.sub(r'\\n', ' ', cleaned_text) # Replace newlines with space
+    cleaned_text = re.sub(r'\\/', '/', cleaned_text) # Replace escaped forward slashes
+    cleaned_text = re.sub(r'\n', ' ', cleaned_text) # Replace newlines with space
+
+    return cleaned_text
+
+def safe_json_loads(text):
+    """Safely loads JSON, handling potential errors."""
+    try:
+      cleaned_text = clean_json_string(text)
+      return json.loads(cleaned_text)
+    except json.JSONDecodeError as e:
+        st.error(f"Failed to parse the response: {e}")
+        return None
+
 # Function to parse bank statement
-def parse_bank_statement_with_gemini(text):
+def parse_bank_statement_with_gemini(text, max_retries = 3):
     """Parses the bank statement using Gemini to extract structured data."""
     if not text:
         return None
-
+    
     prompt = f"""
     You are an expert in analyzing bank statements.
     Your task is to extract key information from the provided text of a bank statement.
@@ -106,29 +134,33 @@ def parse_bank_statement_with_gemini(text):
     {text}
     ```
     """
-    
-    try:
-        response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
-        if response and response.text.strip():
-            # Attempt to parse the JSON response
-            try:
-                 cleaned_response = response.text.replace('```json','').replace('```','') # Remove any code formatting
-                 return json.loads(cleaned_response)
-            except json.JSONDecodeError as e:
-                st.error(f"Failed to parse the response: {e}, Raw: {response.text}")
+    retries = 0
+    while retries <= max_retries:
+        try:
+            response = genai.GenerativeModel("gemini-1.5-flash").generate_content(prompt)
+            if response and response.text.strip():
+                # Attempt to parse the JSON response
+                try:
+                    cleaned_response = response.text.replace('```json','').replace('```','') # Remove any code formatting
+                    return safe_json_loads(cleaned_response)
+                except Exception as e:
+                    st.error(f"Failed to parse the response: {e}")
+                    logging.error(f"Gemini response: {response.text}")
+                    retries += 1
+                    sleep(1) # wait for a second before retry
+                    continue
+            else:
+                st.error("The API response is empty or invalid.")
                 return None
-
-        else:
-            st.error("The API response is empty or invalid.")
+        except Exception as e:
+            st.error(f"Failed to get response from Gemini API: {e}")
             return None
-    except Exception as e:
-         st.error(f"Failed to get response from Gemini API: {e}")
-         return None
+    return None # Return None if max retries reached
         
 def process_data(data):
     """Processes the data from Gemini for display and visualization."""
     if not data:
-        return None, None, None, None
+        return None, None, None
 
     summary_data = {
       "bank_name": data.get("bank_name", "N/A"),
@@ -241,14 +273,14 @@ def create_pdf_report(summary, filename, time_frame = None):
     styles = getSampleStyleSheet()
     story = []
 
-      # Custom title style
+    # Custom title style
     title_style = ParagraphStyle(
-      'Title',
-      parent = styles['h1'],
-      fontSize=20,
-      alignment=TA_LEFT,
-      textColor=colors.navy
-      )
+        'Title',
+        parent=styles['h1'],
+        fontSize=20,
+        alignment=TA_LEFT,
+        textColor=colors.navy
+    )
 
     if time_frame:
         story.append(Paragraph(f"Financial Summary for {time_frame}", title_style))
@@ -265,10 +297,39 @@ def create_pdf_report(summary, filename, time_frame = None):
         alignment=TA_JUSTIFY
     )
     
-    story.append(Paragraph(summary, text_style))
+    # Split summary by line and add each line as a paragraph
+    for line in summary.split("\n"):
+        story.append(Paragraph(line, text_style))
 
     doc.build(story)
 
+
+# Function to display the YouTube video modal
+def show_youtube_modal(show_modal):
+    
+    modal = Modal(
+    "Tired of waiting for the response? 🤔 Watch this famous video while your response is being generated...", 
+    key="youtube-modal",
+    
+    )
+    
+    if show_modal:
+        modal.open()
+
+    if modal.is_open():
+        with modal.container():
+            
+            youtube_url = "https://www.youtube.com/watch?v=C43p8h99Cs0&ab_channel=DNKA"
+            video_id = youtube_url.split("watch?v=")[1].split("&")[0]
+            
+            st.video(f"https://www.youtube.com/embed/{video_id}")
+            
+            sleep(1) # wait for 1 seconds
+            
+            if st.button("Close Modal"):
+                modal.close()
+                
+    return modal.is_open()
 
 # Create tabs at the top
 tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
@@ -276,12 +337,9 @@ tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
 # Handle tab content
 with tab1:
     # Add title and subtitle
-    st.markdown('<h1 class="title">FinExtract</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">This app helps you extract information from your bank statement PDF.</p>', unsafe_allow_html=True)
-
-    st.write("Welcome to FinExtract!")
-    st.write("""This application helps you extract key information from your bank statements quickly and efficiently.
-    Navigate to the AI Service tab to upload your bank statement and get started.""")
+    st.markdown('<h1 class="heading1">FinExtract</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="heading2">This application helps you extract key information from your bank statements quickly and efficiently.Navigate to the AI Service tab to upload your bank statement and get started.</h1>', unsafe_allow_html=True)
+    st.image("images/image.png", caption=None, width=1100)
 
 with tab2:
     st.markdown("""
@@ -304,8 +362,21 @@ with tab2:
         type=["pdf"],
         key="pdf_uploader"
     )
+    
+    # this is used to open the modal only once
+    if 'modal_has_been_opened' not in st.session_state:
+         st.session_state.modal_has_been_opened = False
+    
+    # this will determine when modal should open
+    show_modal = False
 
     if uploaded_file:
+        if not st.session_state.modal_has_been_opened:
+           show_modal = True
+           st.session_state.modal_has_been_opened = True # set to true so that modal does not open again during same session
+
+        modal_is_open = show_youtube_modal(show_modal) # Show the modal immediately after file is uploaded
+      
         structured_text = convert_pdf_to_structured_text(uploaded_file)
         
         if structured_text:
@@ -336,9 +407,8 @@ with tab2:
             col1, col2 = st.columns(spec=[2, 1], gap="small")
 
             with col1:
-                with st.container(border=True):
-                    # Optionally render the PDF viewer
-                     st.text("PDF viewer would go here.")
+                # with st.expander("PDF Viewer"):
+                #     st.text("PDF viewer would go here.")
 
                 if financial_summary:
                     with st.expander("Financial Summary", expanded=True):
@@ -365,11 +435,14 @@ with tab2:
                         fig = px.line(monthly_spending, x = monthly_spending.index, y = ['money_out', 'money_in'])
                         st.plotly_chart(fig)
 
-
                     with st.expander("Category Spending Chart"):
                         category_spending = df.groupby('description')['money_out'].sum()
-                        fig = px.pie(names=category_spending.index, values=category_spending.values, hole = 0.3)
-                        fig.update_traces(textposition='outside', textinfo='percent+label')
+                        # Calculate a height multiplier based on the number of categories
+                        num_categories = len(category_spending)
+                        height_multiplier = max(1, num_categories * 0.2)
+
+                        fig = px.pie(names=category_spending.index, values=category_spending.values, hole = 0.3, height = 300 * height_multiplier)
+                        fig.update_traces(textinfo='none') # remove labels outside pie chart
                         st.plotly_chart(fig)
 
             with col2:

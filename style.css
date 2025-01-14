@@ -16,6 +16,7 @@
     padding: 0.5rem;
 }
 
+
 /* Individual tab styling */
 .stTabs div[role="tablist"] button {
     background-color: #000080;
@@ -59,12 +60,52 @@
 
 /* Customize the app title and subtitle */
 .title {
-    color: black;
     text-align: center;
     padding-top: 10px;
-    padding-bottom: 5px;
     margin-top: 3rem;
+    color:blue;
+    font-weight:bold;
+    font-size:100px;
+    padding-bottom:10px;
 }
+.heading1 {
+    text-align: center; /* Centers the heading */
+    padding-top: 10px; /* Adds space above the text */
+    padding-bottom: 10px; /* Adds space below the text */
+    margin-top: 3rem; /* Adds space above the heading container */
+    color: blue; /* Sets the text color to blue */
+    font-weight: bold; /* Makes the font bold */
+    font-size: 100px; /* Sets a large font size */
+    text-transform: uppercase; /* Converts text to uppercase */
+    letter-spacing: 2px; /* Adds space between letters */
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3); /* Adds a subtle shadow effect */
+    font-family: 'Arial', sans-serif; /* Changes the font family */
+    animation: fadeIn 2s ease-in-out; /* Adds a fade-in animation */
+}
+
+.stImage img {
+    border: 5px solid darkblue; /* Dark blue border */
+    border-radius: 10px; /* Optional: Rounded corners */
+    padding: 5px; /* Space between border and image */
+    display: flex; /* Use Flexbox for centering */
+    justify-content: center; /* Center horizontally */
+    align-items: center; /* Center vertically (optional) */
+
+}
+.heading2 {
+    color: #333; /* Keeps a neutral dark gray text color */
+    text-align: center; /* Centers the subtitle */
+    font-size: 20px; /* Increases the font size for better readability */
+    margin-bottom: 20px; /* Adds space below the subtitle */
+    font-family: 'Arial', sans-serif; /* Applies a clean, modern font */
+    letter-spacing: 1px; /* Adds subtle spacing between characters */
+    line-height: 1.6; /* Improves readability by increasing line height */
+    font-style: italic; /* Makes the text italic for a softer look */
+    text-transform: capitalize; /* Capitalizes the first letter of each word */
+    text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.2); /* Adds a slight shadow effect */
+    opacity: 0.9; /* Slightly reduces opacity for a subtle effect */
+}
+
 
 .subtitle {
     color: #333;
@@ -181,6 +222,11 @@ a[href^="mailto"]:hover {
     background: linear-gradient(135deg, #0000b3 0%, #000080 100%) !important;
     transform: translateY(-2px) !important;
     box-shadow: 0 4px 15px rgba(0,0,128,0.2) !important;
+}
+.stSubheader{
+    color:blue;
+    font-weight:bold;
+    
 }
 
 /* Success message styling */
