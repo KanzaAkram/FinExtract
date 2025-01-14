@@ -250,3 +250,74 @@ a[href^="mailto"]:hover {
     color: #2e7d32 !important;
     border-radius: 5px !important;
 }
+
+/* Container styling for layout */
+.container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /* padding: 20px;
+    height: 100vh; */
+}
+
+/* Left side for text */
+/* .lhs {
+    flex: 1;
+    padding: 20px;
+} */
+
+.rhs {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Heading styles */
+.title {
+    font-size: 64px;
+    font-weight: bold;
+    animation: fadeIn 2s ease-in-out;
+    padding-bottom:5px;
+}
+
+.title .fin {
+    color: black;
+}
+
+.title .extract {
+    color: blue;
+}
+
+/* Subheading styles */
+.subtitle {
+    font-size: 20px;
+    color: #555;
+    margin-top: 10px;
+    animation: fadeIn 3s ease-in-out;
+    /* padding-bottom:10px; */
+
+}
+
+/* Image styles */
+.gradient-img {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(to bottom, #0000ff, #87ceeb);
+    -webkit-mask-image: url('images/image.png');
+    mask-image: url('images/image.png');
+    -webkit-mask-size: cover;
+    mask-size: cover;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

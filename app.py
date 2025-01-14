@@ -19,6 +19,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from reportlab.lib import colors
 import calendar
+from streamlit_modal import Modal
 
 # Setting Streamlit page configuration
 st.set_page_config(page_title="FinExtract", page_icon="📖", layout="wide")
@@ -275,13 +276,74 @@ tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
 
 # Handle tab content
 with tab1:
-    # Add title and subtitle
-    st.markdown('<h1 class="title">FinExtract</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">This app helps you extract information from your bank statement PDF.</p>', unsafe_allow_html=True)
 
-    st.write("Welcome to FinExtract!")
-    st.write("""This application helps you extract key information from your bank statements quickly and efficiently.
-    Navigate to the AI Service tab to upload your bank statement and get started.""")
+    # Load custom CSS
+    with open("style.css") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+    st.markdown("""
+        <div class="container">
+            <!-- Left side -->
+            <div class="lhs">
+                <h1 class="title">
+                    <span class="fin">Fin</span><span class="extract">Extract</span>
+                </h1>
+                <p class="subtitle">This app helps you extract information from your bank statement PDF.</p>
+            </div>
+            <!-- Right side -->
+            <div class="rhs">
+    """, unsafe_allow_html=True)
+
+    # Adjust image dimensions using `width`
+    st.image("images/image.png", caption=None, width=500)  # Set width in pixels
+
+    # Close the container div
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+
+    # Animated text using CSS animation
+    st.markdown("""
+        <div class="welcome-container">
+            <div class="welcome-text">
+                Welcome to <span class="fin">Fin</span><span class="extract">Extract</span>!
+            </div>
+            <p class="welcome-para">This application helps you extract key information from your bank statements quickly and efficiently. Navigate to the AI Service tab to upload your bank statement and get started.</p>
+        </div>
+        <style>
+            .welcome-container {
+                text-align: center;
+                padding-top: 3rem;
+            }
+            .welcome-text {
+                font-size: 2.5rem;
+                color: #000080;
+                margin-bottom: 0.5rem;
+                display: inline-block;
+                animation: fadeInText 1s ease;
+            }
+            .welcome-para {
+                font-size: 1.1rem;
+                color: #333;
+                animation: fadeInPara 1.5s ease;
+            }
+            .fin {
+             color: #000080;
+            }
+             .extract {
+             color: #0000b3;
+            }
+
+            @keyframes fadeInText {
+                from { opacity: 0; transform: translateY(-20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            @keyframes fadeInPara {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
 with tab2:
     st.markdown("""
@@ -326,11 +388,19 @@ with tab2:
                     else:
                       df = df[df['date'].dt.year == int(time_frame)]
                       time_frame = f"Year {time_frame}"
-
+            
             financial_summary = None
             if summary_data and df is not None and not df.empty:
-                with st.spinner("Generating Financial Summary"):
-                   financial_summary = generate_financial_summary(summary_data, df, time_frame)
+                # Open modal
+                modal_obj = Modal(key="summary_loading", title="Generating Summary")
+                with modal_obj.container():
+                    st.video("https://www.youtube.com/watch?v=C43p8h99Cs0&ab_channel=DNKA")
+                    st.caption("Sit back and relax while our AI generates your summary!")
+                
+                financial_summary = generate_financial_summary(summary_data, df, time_frame)
+                modal_obj.close()
+                st.success("Your response is ready!")
+          
 
             # Display PDF and results in two columns
             col1, col2 = st.columns(spec=[2, 1], gap="small")
