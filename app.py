@@ -21,7 +21,7 @@ from reportlab.lib import colors
 import calendar
 import logging  # Import the logging module
 from time import sleep # Import sleep function
-from streamlit_modal import Modal
+# from streamlit_modal import Modal # Removed
 import streamlit.components.v1 as components
 
 # Configure logging to output to console
@@ -31,12 +31,12 @@ logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %
 st.set_page_config(page_title="FinExtract", page_icon="📖", layout="wide")
 
 hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            div[data-testid="stToolbar"] {visibility: hidden;}
-            </style>
-            """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+div[data-testid="stToolbar"] {visibility: hidden;}
+</style>
+"""
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # Add main container with gradient background
@@ -73,7 +73,7 @@ def convert_pdf_to_structured_text(pdf_file):
     except Exception as e:
         st.error(f"Error reading the PDF file: {e}")  # Error message for any other issues
         return ""  # Return empty string in case of error
-
+    
 # Setting up Gemini API key
 gemini_api_key = st.secrets["API_KEY"]  # Replace with your Gemini API key
 
@@ -88,20 +88,20 @@ def generate_unique_key(uploaded_file):
 def clean_json_string(text):
     """Cleans a JSON string to handle various escaping and formatting issues."""
     # Handle escaped quotes within strings
-    cleaned_text = re.sub(r'\\"', r'"', text)
+    cleaned_text = re.sub(r'\"', r'"', text)
     # remove non-escaped backslashes
-    cleaned_text = re.sub(r'\\(?!\")|\\\\', r'', cleaned_text)
-    cleaned_text = re.sub(r'\\n', ' ', cleaned_text) # Replace newlines with space
-    cleaned_text = re.sub(r'\\/', '/', cleaned_text) # Replace escaped forward slashes
+    cleaned_text = re.sub(r'(?!")|\\', r'', cleaned_text)
+    cleaned_text = re.sub(r'\n', ' ', cleaned_text) # Replace newlines with space
+    cleaned_text = re.sub(r'\/', '/', cleaned_text) # Replace escaped forward slashes
     cleaned_text = re.sub(r'\n', ' ', cleaned_text) # Replace newlines with space
 
     return cleaned_text
-
+    
 def safe_json_loads(text):
     """Safely loads JSON, handling potential errors."""
     try:
-      cleaned_text = clean_json_string(text)
-      return json.loads(cleaned_text)
+        cleaned_text = clean_json_string(text)
+        return json.loads(cleaned_text)
     except json.JSONDecodeError as e:
         st.error(f"Failed to parse the response: {e}")
         return None
@@ -111,7 +111,7 @@ def parse_bank_statement_with_gemini(text, max_retries = 3):
     """Parses the bank statement using Gemini to extract structured data."""
     if not text:
         return None
-    
+
     prompt = f"""
     You are an expert in analyzing bank statements.
     Your task is to extract key information from the provided text of a bank statement.
@@ -156,7 +156,7 @@ def parse_bank_statement_with_gemini(text, max_retries = 3):
             st.error(f"Failed to get response from Gemini API: {e}")
             return None
     return None # Return None if max retries reached
-        
+
 def process_data(data):
     """Processes the data from Gemini for display and visualization."""
     if not data:
@@ -173,15 +173,15 @@ def process_data(data):
       "total_money_out": data.get("total_money_out", "N/A"),
       "ending_balance": data.get("ending_balance", "N/A")
     }
-    
+
     transactions = data.get("transactions", [])
     df = None
     if transactions:
-      df = pd.DataFrame(transactions)
-      df['date'] = pd.to_datetime(df['date'], errors='coerce', format = 'mixed')
-      df['money_out'] = pd.to_numeric(df['money_out'], errors='coerce').fillna(0)
-      df['money_in'] = pd.to_numeric(df['money_in'], errors='coerce').fillna(0)
-    
+        df = pd.DataFrame(transactions)
+        df['date'] = pd.to_datetime(df['date'], errors='coerce', format = 'mixed')
+        df['money_out'] = pd.to_numeric(df['money_out'], errors='coerce').fillna(0)
+        df['money_in'] = pd.to_numeric(df['money_in'], errors='coerce').fillna(0)
+
     return summary_data, df, transactions
 
 def generate_financial_summary(summary_data, df, time_frame):
@@ -189,7 +189,7 @@ def generate_financial_summary(summary_data, df, time_frame):
 
     if not summary_data or df is None or df.empty:
         return "No data available for financial summary."
-    
+
     formatted_starting_balance = summary_data.get('starting_balance', 'N/A')
     formatted_total_money_in = summary_data.get('total_money_in', 'N/A')
     formatted_total_money_out = summary_data.get('total_money_out', 'N/A')
@@ -208,7 +208,7 @@ def generate_financial_summary(summary_data, df, time_frame):
       formatted_ending_balance = formatted_ending_balance.replace(",", "")
 
     if time_frame:
-          summary_text = f"""
+            summary_text = f"""
             Here is the financial data:
             Bank Name: {summary_data.get('bank_name', 'N/A')}
             Customer Name: {summary_data.get('customer_name', 'N/A')}
@@ -256,7 +256,7 @@ def generate_financial_summary(summary_data, df, time_frame):
                 - Notable recurring items like income and expenses
             Provide key insights and recommendations in points. Make the output very well structured and formatted using markdown
         """
-
+    
     try:
         response = genai.GenerativeModel("gemini-1.5-flash").generate_content(summary_text)
         if response and response.text.strip():
@@ -296,40 +296,41 @@ def create_pdf_report(summary, filename, time_frame = None):
         leading=16,
         alignment=TA_JUSTIFY
     )
-    
+
     # Split summary by line and add each line as a paragraph
     for line in summary.split("\n"):
         story.append(Paragraph(line, text_style))
 
     doc.build(story)
 
-
 # Function to display the YouTube video modal
-def show_youtube_modal(show_modal):
-    
-    modal = Modal(
-    "Tired of waiting for the response? 🤔 Watch this famous video while your response is being generated...", 
-    key="youtube-modal",
-    
-    )
-    
-    if show_modal:
-        modal.open()
+# def show_youtube_modal(): # Removed
+#     modal = Modal(
+#         "Tired of waiting for the response? 🤔 Watch this famous video while your response is being generated...", 
+#         key="youtube-modal"
+#     )
 
-    if modal.is_open():
-        with modal.container():
-            
-            youtube_url = "https://www.youtube.com/watch?v=C43p8h99Cs0&ab_channel=DNKA"
-            video_id = youtube_url.split("watch?v=")[1].split("&")[0]
-            
-            st.video(f"https://www.youtube.com/embed/{video_id}")
-            
-            sleep(1) # wait for 1 seconds
-            
-            if st.button("Close Modal"):
-                modal.close()
-                
-    return modal.is_open()
+#     if st.session_state.show_modal: # checks if modal should open
+#         modal.open()
+
+#     if modal.is_open():
+#         with modal.container():
+#             youtube_url = "https://www.youtube.com/watch?v=C43p8h99Cs0&ab_channel=DNKA"
+#             video_id = youtube_url.split("watch?v=")[1].split("&")[0]
+        
+#             st.video(f"https://www.youtube.com/embed/{video_id}")
+        
+#             if st.button("Close Modal"):
+#                 st.session_state.show_modal = False # update session state so that modal closes
+#                 modal.close()
+
+# Initialize session state variables if they don't exist
+if 'structured_text' not in st.session_state:
+    st.session_state.structured_text = None
+if 'processed_data' not in st.session_state:
+   st.session_state.processed_data = None
+if 'financial_summary' not in st.session_state:
+     st.session_state.financial_summary = None
 
 # Create tabs at the top
 tab1, tab2, tab3 = st.tabs(["Home", "AI Service", "Contact Us"])
@@ -343,217 +344,213 @@ with tab1:
 
 with tab2:
     st.markdown("""
-            <style>
-                .stFileUploader label {
-                    background-color: #00664D !important;
-                    color: white !important;
-                    border-radius: 5px !important;
-                    padding: 10px 20px !important;
-                    transition: background-color 0.3s, color 0.3s !important;
-                 }
+    <style>
+    .stFileUploader label {
+        background-color: #00664D !important;
+        color: white !important;
+        border-radius: 5px !important;
+        padding: 10px 20px !important;
+        transition: background-color 0.3s, color 0.3s !important;
+    }
 
-                 .stFileUploader label:hover {
-                     background-color: #004D40 !important;
-                 }
-            </style>
-        """, unsafe_allow_html=True)
+    .stFileUploader label:hover {
+        background-color: #004D40 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
         "Upload your bank statement PDF",
         type=["pdf"],
         key="pdf_uploader"
     )
     
-    # this is used to open the modal only once
-    if 'modal_has_been_opened' not in st.session_state:
-         st.session_state.modal_has_been_opened = False
-    
-    # this will determine when modal should open
-    show_modal = False
-
     if uploaded_file:
-        if not st.session_state.modal_has_been_opened:
-           show_modal = True
-           st.session_state.modal_has_been_opened = True # set to true so that modal does not open again during same session
 
-        modal_is_open = show_youtube_modal(show_modal) # Show the modal immediately after file is uploaded
-      
-        structured_text = convert_pdf_to_structured_text(uploaded_file)
-        
-        if structured_text:
-            with st.spinner("Analyzing Bank Statement ..."):
-              parsed_data = parse_bank_statement_with_gemini(structured_text)
+        # Embed video immediately after file is uploaded
+        st.markdown(" **Tired of waiting for AI to generate a response? Huh! Now no more. See this trending video**")
+        youtube_url = "https://www.youtube.com/watch?v=C43p8h99Cs0&ab_channel=DNKA"
+        video_id = youtube_url.split("watch?v=")[1].split("&")[0]
+        st.video(f"https://www.youtube.com/embed/{video_id}")
+       
+        with st.spinner("Analyzing Bank Statement ..."):
+            if not st.session_state.structured_text or uploaded_file != st.session_state.uploaded_file:
+                structured_text = convert_pdf_to_structured_text(uploaded_file)
+                st.session_state.structured_text = structured_text
+                st.session_state.uploaded_file = uploaded_file
 
-            summary_data, df, transactions = process_data(parsed_data)
-            time_frame = None
-            if summary_data and df is not None and not df.empty:
-                if df['date'].dt.year.nunique() > 1:
-                  unique_years = sorted(df['date'].dt.year.unique(), reverse = True)
-                  time_frame = st.select_slider("Select time frame", options = ["All time"] + [f"{year}" for year in unique_years] + [f"{calendar.month_name[month]}-{year}" for year in unique_years for month in range(1,13)])
-                  if time_frame != "All time":
+                if structured_text:
+                    parsed_data = parse_bank_statement_with_gemini(structured_text)
+                    st.session_state.processed_data = process_data(parsed_data)
+                
+        if st.session_state.processed_data:
+           summary_data, df, transactions = st.session_state.processed_data
+           time_frame = None
+           if summary_data and df is not None and not df.empty:
+              if df['date'].dt.year.nunique() > 1:
+                 unique_years = sorted(df['date'].dt.year.unique(), reverse = True)
+                 time_frame = st.select_slider("Select time frame", options = ["All time"] + [f"{year}" for year in unique_years] + [f"{calendar.month_name[month]}-{year}" for year in unique_years for month in range(1,13)])
+                 if time_frame != "All time":
                     if time_frame.find("-") != -1:
-                      month, year = time_frame.split("-")
-                      df = df[(df['date'].dt.year == int(year)) & (df['date'].dt.month == list(calendar.month_name).index(month))]
-                      time_frame = f"{calendar.month_name[list(calendar.month_name).index(month)]} of {year}"
+                       month, year = time_frame.split("-")
+                       df = df[(df['date'].dt.year == int(year)) & (df['date'].dt.month == list(calendar.month_name).index(month))]
+                       time_frame = f"{calendar.month_name[list(calendar.month_name).index(month)]} of {year}"
                     else:
-                      df = df[df['date'].dt.year == int(time_frame)]
-                      time_frame = f"Year {time_frame}"
+                       df = df[df['date'].dt.year == int(time_frame)]
+                       time_frame = f"Year {time_frame}"
+           if not st.session_state.financial_summary or (summary_data and df is not None and not df.empty):
+             st.session_state.financial_summary = generate_financial_summary(summary_data, df, time_frame)
 
-            financial_summary = None
-            if summary_data and df is not None and not df.empty:
-                with st.spinner("Generating Financial Summary"):
-                   financial_summary = generate_financial_summary(summary_data, df, time_frame)
+        # Display PDF and results in two columns
+        col1, col2 = st.columns(spec=[2, 1], gap="small")
+        
+        with col1:
+          # with st.expander("PDF Viewer"):
+            #  st.text("PDF viewer would go here.")
+           if st.session_state.financial_summary:
+            with st.expander("Financial Summary", expanded=True):
+                 st.write(st.session_state.financial_summary)
 
-            # Display PDF and results in two columns
-            col1, col2 = st.columns(spec=[2, 1], gap="small")
-
-            with col1:
-                # with st.expander("PDF Viewer"):
-                #     st.text("PDF viewer would go here.")
-
-                if financial_summary:
-                    with st.expander("Financial Summary", expanded=True):
-                        st.write(financial_summary)
-
-                        # Download PDF report
-                        report_filename = "financial_report.pdf"
-                        create_pdf_report(financial_summary, report_filename, time_frame)
-                        with open(report_filename, "rb") as f:
-                            pdf_bytes = f.read()
-
-                        st.download_button(
-                            label="Download Financial Report (PDF)",
-                            data=pdf_bytes,
-                            file_name=report_filename,
-                            mime="application/pdf",
-                        )
-
+                 # Download PDF report
+                 report_filename = "financial_report.pdf"
+                 create_pdf_report(st.session_state.financial_summary, report_filename, time_frame)
+                 with open(report_filename, "rb") as f:
+                     pdf_bytes = f.read()
+                 st.download_button(
+                        label="Download Financial Report (PDF)",
+                        data=pdf_bytes,
+                        file_name=report_filename,
+                        mime="application/pdf",
+                    )
+           if st.session_state.processed_data:
+                summary_data, df, transactions = st.session_state.processed_data
                 if df is not None and not df.empty:
-                    with st.expander("Monthly Spending Chart"):
-                        monthly_spending = df.groupby(df['date'].dt.month).agg({'money_out':'sum', 'money_in':'sum'})
-                        monthly_spending.index = [calendar.month_name[month] for month in monthly_spending.index]
-                        monthly_spending = monthly_spending.reindex([calendar.month_name[month] for month in range(1,13)], fill_value=0)
-                        fig = px.line(monthly_spending, x = monthly_spending.index, y = ['money_out', 'money_in'])
-                        st.plotly_chart(fig)
+                   with st.expander("Monthly Spending Chart"):
+                       monthly_spending = df.groupby(df['date'].dt.month).agg({'money_out':'sum', 'money_in':'sum'})
+                       monthly_spending.index = [calendar.month_name[month] for month in monthly_spending.index]
+                       monthly_spending = monthly_spending.reindex([calendar.month_name[month] for month in range(1,13)], fill_value=0)
+                       fig = px.line(monthly_spending, x = monthly_spending.index, y = ['money_out', 'money_in'])
+                       st.plotly_chart(fig)
+                   
+                   with st.expander("Category Spending Chart"):
+                       category_spending = df.groupby('description')['money_out'].sum()
+                       # Calculate a height multiplier based on the number of categories
+                       num_categories = len(category_spending)
+                       height_multiplier = max(1, num_categories * 0.2)
+                       
+                       fig = px.pie(names=category_spending.index, values=category_spending.values, hole = 0.3, height = 300 * height_multiplier)
+                       fig.update_traces(textinfo='none') # remove labels outside pie chart
+                       st.plotly_chart(fig)
 
-                    with st.expander("Category Spending Chart"):
-                        category_spending = df.groupby('description')['money_out'].sum()
-                        # Calculate a height multiplier based on the number of categories
-                        num_categories = len(category_spending)
-                        height_multiplier = max(1, num_categories * 0.2)
-
-                        fig = px.pie(names=category_spending.index, values=category_spending.values, hole = 0.3, height = 300 * height_multiplier)
-                        fig.update_traces(textinfo='none') # remove labels outside pie chart
-                        st.plotly_chart(fig)
-
-            with col2:
-                if summary_data:
-                    with st.expander("Customer Information", expanded=True):
+        with col2:
+            if st.session_state.processed_data:
+               summary_data, df, transactions = st.session_state.processed_data
+               if summary_data:
+                   with st.expander("Customer Information", expanded=True):
                         # Display extracted information
                         labels = ["Bank Name", "Customer Name", "Account Number", "Statement Start Date", "Statement End Date", "Starting Balance", "Total Money In", "Total Money Out", "Ending Balance"]
                         for label, key in zip(labels, summary_data):
-                            st.markdown(f"<p style='font-family: Arial; color: black; font-size: 10px;'>{label}:</p>", unsafe_allow_html=True)
-                            st.write(summary_data[key] if summary_data[key] != "N/A" else "N/A")
+                             st.markdown(f"<p style='font-family: Arial; color: black; font-size: 10px;'>{label}:</p>", unsafe_allow_html=True)
+                             st.write(summary_data[key] if summary_data[key] != "N/A" else "N/A")
+               if df is not None and not df.empty:
+                   with st.expander("Transactions Table", expanded=True):
+                        # Convert Date column to string to avoid issues with display
+                        df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+                        st.dataframe(df)
+            else:
+                 st.error("No data found.")
 
-                    if df is not None and not df.empty:
-                        with st.expander("Transactions Table", expanded=True):
-                             # Convert Date column to string to avoid issues with display
-                             df['date'] = df['date'].dt.strftime('%Y-%m-%d')
-                             st.dataframe(df)
-                else:
-                    st.error("No data found.")
-            
-            # Add a chat interface at bottom
-            if structured_text:
-               st.markdown("<hr>", unsafe_allow_html=True)
-               st.subheader("Chat with your bank statement")
-               query = st.text_input("Enter your question:")
-               if query:
-                   chat_prompt = f"""
-                       You are a helpful assistant, skilled at understanding and responding to questions regarding bank statements.
-                       Here is a bank statement text : "{structured_text}"
-                       Here is the user query: "{query}"
-                       Provide a response in markdown format.
-                     """
-                   try:
-                        chat_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(chat_prompt)
-                        if chat_response and chat_response.text.strip():
-                            st.write(chat_response.text)
-                        else:
-                            st.write("Could not generate a response.")
-                   except Exception as e:
-                       st.error(f"Error getting response from Gemini API: {e}")
+        # Add a chat interface at bottom
+        if st.session_state.structured_text:
+           st.markdown("<hr>", unsafe_allow_html=True)
+           st.subheader("Chat with your bank statement")
+           query = st.text_input("Enter your question:")
+           if query:
+               chat_prompt = f"""
+                    You are a helpful assistant, skilled at understanding and responding to questions regarding bank statements.
+                    Here is a bank statement text : "{st.session_state.structured_text}"
+                    Here is the user query: "{query}"
+                    Provide a response in markdown format.
+                   """
+               try:
+                    chat_response = genai.GenerativeModel("gemini-1.5-flash").generate_content(chat_prompt)
+                    if chat_response and chat_response.text.strip():
+                       st.write(chat_response.text)
+                    else:
+                        st.write("Could not generate a response.")
+               except Exception as e:
+                   st.error(f"Error getting response from Gemini API: {e}")
 
 with tab3:
     # Contact page container
     st.markdown("""
-        <div style='text-align: center; padding: 2rem 0;'>
-            <h1 style='color: #000080; margin-bottom: 2rem;'>Get in Touch</h1>
-            <p style='font-size: 1.2rem; color: #333; margin-bottom: 3rem;'>
-                Have questions or need assistance? We're here to help!
-            </p>
-        </div>
+    <div style='text-align: center; padding: 2rem 0;'>
+        <h1 style='color: #000080; margin-bottom: 2rem;'>Get in Touch</h1>
+        <p style='font-size: 1.2rem; color: #333; margin-bottom: 3rem;'>
+            Have questions or need assistance? We're here to help!
+        </p>
+    </div>
     """, unsafe_allow_html=True)
 
     # Create three columns for contact information
     col1, col2, col3 = st.columns(3)
 
     contact_box_style = """
-        text-align: center;
-        padding: 2rem;
-        background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
-        border-radius: 15px;
-        position: relative;
-        min-height: 250px;
-        box-shadow: 0 4px 15px rgba(0,0,128,0.1);
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
+    border-radius: 15px;
+    position: relative;
+    min-height: 250px;
+    box-shadow: 0 4px 15px rgba(0,0,128,0.1);
     """
 
     # Add a gradient border using pseudo-element
     contact_box_wrapper = """
-        position: relative;
-        padding: 3px;
-        background: linear-gradient(145deg, #000080, #0000b3);
-        border-radius: 15px;
-        margin-bottom: 1rem;
+    position: relative;
+    padding: 3px;
+    background: linear-gradient(145deg, #000080, #0000b3);
+    border-radius: 15px;
+    margin-bottom: 1rem;
     """
 
     with col1:
         st.markdown(f"""
-            <div style='{contact_box_wrapper}'>
-                <div style='{contact_box_style}'>
-                <h3 style='color: #000080; margin-bottom: 0rem; padding-bottom:2rem'>📧 Email Us</h3>
-                <p style='color: #333;'>For general inquiries:</p>
-                <a href='mailto:kanzaakram123@gmail.com' style='color: #000080; text-decoration: none; font-weight: bold;'>
-                    kanzaakram123@gmail.com
-                </a>                <p style='color: #333; margin-top: 1rem;'>We typically respond within 24 hours.</p>
-                </div>
+        <div style='{contact_box_wrapper}'>
+            <div style='{contact_box_style}'>
+            <h3 style='color: #000080; margin-bottom: 0rem; padding-bottom:2rem'>📧 Email Us</h3>
+            <p style='color: #333;'>For general inquiries:</p>
+            <a href='mailto:kanzaakram123@gmail.com' style='color: #000080; text-decoration: none; font-weight: bold;'>
+                kanzaakram123@gmail.com
+            </a>                <p style='color: #333; margin-top: 1rem;'>We typically respond within 24 hours.</p>
             </div>
-            </div>
+        </div>
+        </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-            <div style='{contact_box_wrapper}'>
-                <div style='{contact_box_style}'>
-                <h3 style='color: #000080; margin-bottom: 0rem;'>📞 Call Us</h3>
-                <p style='color: #333;'>Customer Support:</p>
-                <p style='color: #000080; font-weight: bold;'>+1-XXX-XXX-XXXX</p>
-                <p style='color: #333; margin-top: 1rem; padding-bottom:3.7rem'>Available Monday-Friday<br>9:00 AM - 5:00 PM EST</p>
-                </div>
+        <div style='{contact_box_wrapper}'>
+            <div style='{contact_box_style}'>
+            <h3 style='color: #000080; margin-bottom: 0rem;'>📞 Call Us</h3>
+            <p style='color: #333;'>Customer Support:</p>
+            <p style='color: #000080; font-weight: bold;'>+1-XXX-XXX-XXXX</p>
+            <p style='color: #333; margin-top: 1rem; padding-bottom:3.7rem'>Available Monday-Friday<br>9:00 AM - 5:00 PM EST</p>
             </div>
+        </div>
         """, unsafe_allow_html=True)
 
     with col3:
         st.markdown(f"""
-            <div style='{contact_box_wrapper}'>
-                <div style='{contact_box_style}'>
-                <h3 style='color: #000080; margin-bottom: 0rem'>🌐 Visit Us</h3>
-                <p style='color: #333;'>Find us online:</p>
-                <a href='https://finextract.streamlit.app/' target='_blank' style='color: #000080; text-decoration: none; font-weight: bold;'>
-                    finextract.streamlit.app
-                </a>
-                <p style='color: #333; margin-top: 1rem;padding-bottom:4.7rem'>Available 24/7</p>
-                </div>
+        <div style='{contact_box_wrapper}'>
+            <div style='{contact_box_style}'>
+            <h3 style='color: #000080; margin-bottom: 0rem'>🌐 Visit Us</h3>
+            <p style='color: #333;'>Find us online:</p>
+            <a href='https://finextract.streamlit.app/' target='_blank' style='color: #000080; text-decoration: none; font-weight: bold;'>
+                finextract.streamlit.app
+            </a>
+            <p style='color: #333; margin-top: 1rem;padding-bottom:4.7rem'>Available 24/7</p>
             </div>
+        </div>
         """, unsafe_allow_html=True)
 
     # Add FAQ section
@@ -594,7 +591,7 @@ with tab3:
     with form_col1:
         name = st.text_input("Name")
         email = st.text_input("Email")
-        
+
     with form_col2:
         subject = st.text_input("Subject")
         message = st.text_area("Message")
